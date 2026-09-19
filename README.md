@@ -12,30 +12,26 @@ Install only what you need, or install the full suite. Click any package below t
 
 | Package | Purpose | Docs | Installation |
 | :--- | :--- | :---: | :--- |
-| **`@dark-matter/cli`** | The complete Dark Matter umbrella suite | [📖 Docs](./packages/cli/README.md) | `agy install @dark-matter/cli` |
-| **`@dark-matter/neuron`** | Progressive Non-Linear Context Graph (PNG-RAG) memory engine with QMD hybrid vector search | [📖 Docs](./packages/neuron/README.md) | `agy install @dark-matter/neuron` |
-| **`@dark-matter/statusline`** | Telemetry-aware, modular terminal status bar with slot reordering & custom components | [📖 Docs](./packages/statusline/README.md) | `agy install @dark-matter/statusline` |
-| **`@dark-matter/milestone`** | Decoupled terminal task and milestone execution tracker | [📖 Docs](./packages/milestone/README.md) | `agy install @dark-matter/milestone` |
+| **`@dark-matter/cli`** | Complete umbrella suite delivering memory, live telemetry status bar, and task execution in one install. | [📖 Docs](./packages/cli/README.md) | `agy install @dark-matter/cli` |
+| **`@dark-matter/neuron`** | Eliminates agent session amnesia with a dependency-free memory graph that recalls past context without token bloat. | [📖 Docs](./packages/neuron/README.md) | `agy install @dark-matter/neuron` |
+| **`@dark-matter/statusline`** | Eliminates blind terminal coding by pinning live quota countdowns, model badges, and git branch to your status bar. | [📖 Docs](./packages/statusline/README.md) | `agy install @dark-matter/statusline` |
+| **`@dark-matter/milestone`** | Prevents complex goals from derailing by ambiently tracking tasks and auto-advancing focus with zero LLM overhead. | [📖 Docs](./packages/milestone/README.md) | `agy install @dark-matter/milestone` |
 
 ---
 
 ## 🚀 Deep-Dive Guides
 
-* 🧠 [**Neuron** (`@dark-matter/neuron`)](./packages/neuron/README.md)  
-  **The Problem**: AI coding agents suffer from amnesia across restarts and drown in token costs when trying to re-read everything.  
-  **The Solution**: A lightweight, dependency-free cognitive memory architecture that keeps your agent perpetually aware of past architectural decisions, user preferences, and business goals—without consuming prompt tokens until recalled.
+* 🧠 [**Neuron Architecture & Vector RAG** (`@dark-matter/neuron`)](./packages/neuron/README.md)  
+  A 3-tier cognitive memory hierarchy (L1 Working Consciousness focus via CLI, L2 Context Graph JSON pointers, and L3 Episodic Markdown logs backed by QMD hybrid vector embeddings). Features asynchronous session consolidation, automated wake-up hooks, and bang-command query capabilities.
 
-* 📊 [**Statusline** (`@dark-matter/statusline`)](./packages/statusline/README.md)  
-  **The Problem**: Flying blind in the terminal without knowing how much quota is left, when rolling rate limits reset, or what mode the agent is in.  
-  **The Solution**: A modular, telemetry-aware live status bar pinned to your terminal footer. Shows real-time quota countdown timers, active AI model, git branch, and context window %. Fully customizable on the fly with numbered slot reordering (`!statusline order 4 1 2 3`).
+* 📊 [**Statusline Telemetry Engine & Reordering** (`@dark-matter/statusline`)](./packages/statusline/README.md)  
+  High-speed subshell pipeline ingesting real-time JSON telemetry from `agy`'s stdin. Computes dynamic rolling quota resets (5-hour and 7-day windows), integer-rounded context utilization, and ANSI escape sequences. Supports fast 1-indexed slot reordering via `!statusline order 4 1 2 3`.
 
-* 🧩 [**Custom Statusline Components**](./packages/statusline/COMPONENTS.md)  
-  **The Problem**: Status bars are typically rigid and hardcoded, making it difficult to show project-specific metrics like battery, docker containers, or test statuses.  
-  **The Solution**: An open, plug-and-play component contract. Drop any executable script into `~/.config/statusline/components/`—or just ask your agent to write one—and it is instantly discovered and ready to add.
+* 🧩 [**Extensible Component Contract**](./packages/statusline/COMPONENTS.md)  
+  Open standard for third-party statusline widgets. Discovers both built-in components and user scripts dropped in `~/.config/statusline/components/`. Enforces a strict contract: metadata comment header (`# Description:`), JSON stdin ingestion, and isolated stdout rendering.
 
-* 🎯 [**Milestone** (`@dark-matter/milestone`)](./packages/milestone/README.md)  
-  **The Problem**: Complex tasks derail when agents lose track of their step-by-step progress or bloat the conversation history with repetitive status updates.  
-  **The Solution**: An ambient, decoupled task tracker that auto-discovers milestones across nested subdirectories, auto-advances current focus, and operates with zero LLM overhead.
+* 🎯 [**Milestone Tree Traversal & Task Engine** (`@dark-matter/milestone`)](./packages/milestone/README.md)  
+  Deterministic task execution engine operating over workspace `.milestones.json` files. Implements recursive upward directory traversal to detect project milestones from deep subdirectories, manages discrete task states (`not_started`, `in_progress`, `completed`), and dynamically drives focus markers.
 
 ---
 

@@ -21,10 +21,21 @@ Install only what you need, or install the full suite. Click any package below t
 
 ## 🚀 Deep-Dive Guides
 
-* 🧠 [**Neuron Engine Memory Architecture**](./packages/neuron/README.md): 3-tier cognitive memory hierarchy (L1 Working Focus, L2 Context Graph JSON, L3 Episodic Logs & Vector Embeddings).
-* 📊 [**Statusline Component Engine & Configuration**](./packages/statusline/README.md): Configure components (`mode`, `project`, `usage`, `model`) and reorder slots via `!statusline order 4 1 2 3`.
-* 🧩 [**Custom Statusline Components Guide**](./packages/statusline/COMPONENTS.md): How to prompt Gemini/AGY to build custom components (Battery, Git, Runtimes).
-* 🎯 [**Milestone & Task Tracking**](./packages/milestone/README.md): Ambient progress and task auto-advancement without polluting LLM token context.
+* 🧠 [**Neuron** (`@dark-matter/neuron`)](./packages/neuron/README.md)  
+  **The Problem**: AI coding agents suffer from amnesia across restarts and drown in token costs when trying to re-read everything.  
+  **The Solution**: A lightweight, dependency-free cognitive memory architecture that keeps your agent perpetually aware of past architectural decisions, user preferences, and business goals—without consuming prompt tokens until recalled.
+
+* 📊 [**Statusline** (`@dark-matter/statusline`)](./packages/statusline/README.md)  
+  **The Problem**: Flying blind in the terminal without knowing how much quota is left, when rolling rate limits reset, or what mode the agent is in.  
+  **The Solution**: A modular, telemetry-aware live status bar pinned to your terminal footer. Shows real-time quota countdown timers, active AI model, git branch, and context window %. Fully customizable on the fly with numbered slot reordering (`!statusline order 4 1 2 3`).
+
+* 🧩 [**Custom Statusline Components**](./packages/statusline/COMPONENTS.md)  
+  **The Problem**: Status bars are typically rigid and hardcoded, making it difficult to show project-specific metrics like battery, docker containers, or test statuses.  
+  **The Solution**: An open, plug-and-play component contract. Drop any executable script into `~/.config/statusline/components/`—or just ask your agent to write one—and it is instantly discovered and ready to add.
+
+* 🎯 [**Milestone** (`@dark-matter/milestone`)](./packages/milestone/README.md)  
+  **The Problem**: Complex tasks derail when agents lose track of their step-by-step progress or bloat the conversation history with repetitive status updates.  
+  **The Solution**: An ambient, decoupled task tracker that auto-discovers milestones across nested subdirectories, auto-advances current focus, and operates with zero LLM overhead.
 
 ---
 

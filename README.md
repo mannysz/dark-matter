@@ -12,10 +12,10 @@ Install only what you need, or install the full suite. Click any package below t
 
 | Package | Purpose | Docs | Installation |
 | :--- | :--- | :---: | :--- |
+| **`@dark-matter/cli`** | The complete Dark Matter umbrella suite | [📖 Docs](./packages/cli/README.md) | `agy install @dark-matter/cli` |
 | **`@dark-matter/neuron`** | Progressive Non-Linear Context Graph (PNG-RAG) memory engine with QMD hybrid vector search | [📖 Docs](./packages/neuron/README.md) | `agy install @dark-matter/neuron` |
 | **`@dark-matter/statusline`** | Telemetry-aware, modular terminal status bar with slot reordering & custom components | [📖 Docs](./packages/statusline/README.md) | `agy install @dark-matter/statusline` |
 | **`@dark-matter/milestone`** | Decoupled terminal task and milestone execution tracker | [📖 Docs](./packages/milestone/README.md) | `agy install @dark-matter/milestone` |
-| **`@dark-matter/cli`** | The complete Dark Matter umbrella suite | [📖 Docs](./packages/cli/README.md) | `agy install @dark-matter/cli` |
 
 ---
 

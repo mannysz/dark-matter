@@ -1,0 +1,5 @@
+{
+  "name": "dark-matter-statusline",
+  "version": "1.0.0",
+  "description": "Modular, telemetry-aware terminal status bar engine for Google Antigravity (agy)"
+}

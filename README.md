@@ -15,7 +15,7 @@ Install only what you need, or install the full suite. Click any package below t
 | **`@dark-matter/cli`** | Complete umbrella suite delivering memory, live telemetry status bar, and task execution in one install. | [📖 Docs](./packages/cli/README.md) | `agy install @dark-matter/cli` |
 | **`@dark-matter/neuron`** | Eliminates agent session amnesia with a dependency-free memory graph that recalls past context without token bloat. | [📖 Docs](./packages/neuron/README.md) | `agy install @dark-matter/neuron` |
 | **`@dark-matter/statusline`** | Eliminates blind terminal coding by pinning live quota countdowns, model badges, and git branch to your status bar. | [📖 Docs](./packages/statusline/README.md) | `agy install @dark-matter/statusline` |
-| **`@dark-matter/milestone`** | Prevents complex goals from derailing by ambiently tracking tasks and auto-advancing focus with zero LLM overhead. | [📖 Docs](./packages/milestone/README.md) | `agy install @dark-matter/milestone` |
+| **`@dark-matter/milestone`** `[Experimental]` | Prevents complex goals from derailing by ambiently tracking tasks and auto-advancing focus with zero LLM overhead. *(Work in progress)* | [📖 Docs](./packages/milestone/README.md) | `agy install @dark-matter/milestone` |
 
 ---
 
@@ -30,8 +30,8 @@ Install only what you need, or install the full suite. Click any package below t
 * 🧩 [**Extensible Component Contract**](./packages/statusline/COMPONENTS.md)  
   Open standard for third-party statusline widgets. Discovers both built-in components and user scripts dropped in `~/.config/statusline/components/`. Enforces a strict contract: metadata comment header (`# Description:`), JSON stdin ingestion, and isolated stdout rendering.
 
-* 🎯 [**Milestone Tree Traversal & Task Engine** (`@dark-matter/milestone`)](./packages/milestone/README.md)  
-  Deterministic task execution engine operating over workspace `.milestones.json` files. Implements recursive upward directory traversal to detect project milestones from deep subdirectories, manages discrete task states (`not_started`, `in_progress`, `completed`), and dynamically drives focus markers.
+* 🎯 [**Milestone Tree Traversal & Task Engine** (`@dark-matter/milestone`) `[Experimental]`](./packages/milestone/README.md)  
+  *(Work in Progress / Experimental)* Deterministic task execution engine operating over workspace `.milestones.json` files. Implements recursive upward directory traversal to detect project milestones from deep subdirectories, manages discrete task states (`not_started`, `in_progress`, `completed`), and dynamically drives focus markers.
 
 ---
 

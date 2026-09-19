@@ -1,4 +1,8 @@
-# 🎯 @dark-matter/milestone
+# 🎯 @dark-matter/milestone `[Experimental]`
+
+> [!WARNING]
+> **Status: Experimental / Work in Progress**
+> This module is actively undergoing major architectural expansion and design iterations. APIs, schemas, and CLI commands may change before the stable 1.0 release.
 
 > Ambient terminal task and milestone tracking for **Google Antigravity (`agy`)**.
 

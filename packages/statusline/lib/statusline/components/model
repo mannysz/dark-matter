@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Description: Shows active AI model name and tier
+#
+# Reads agy telemetry JSON from stdin and prints styled model name.
+
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
+  exit 0
+fi
+
+CYAN="\033[36m"
+RESET="\033[0m"
+
+MODEL_NAME=$(echo "$INPUT" | jq -r '.model.display_name // .model.id // empty' 2>/dev/null)
+if [ -n "$MODEL_NAME" ]; then
+  printf "${CYAN}%s${RESET}" "$MODEL_NAME"
+fi

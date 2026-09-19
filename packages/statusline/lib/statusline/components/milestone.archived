@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Description: Shows current active milestone and task progress (archived)
+#
+# Reads .milestones.json from active directory and renders milestone tag.
+
+INPUT=$(cat)
+
+TARGET_DIR="${STATUSLINE_CWD:-}"
+if [ -z "$TARGET_DIR" ]; then
+  TARGET_DIR=$(echo "$INPUT" | jq -r '.workspace_path // .cwd // empty' 2>/dev/null)
+fi
+if [ -z "$TARGET_DIR" ]; then
+  TARGET_DIR="$PWD"
+fi
+
+MIL_FILE="$TARGET_DIR/.milestones.json"
+if [ ! -f "$MIL_FILE" ]; then
+  exit 0
+fi
+
+ACTIVE_ID=$(jq -r '.active_milestone // empty' "$MIL_FILE" 2>/dev/null)
+if [ -z "$ACTIVE_ID" ]; then
+  exit 0
+fi
+
+MILESTONE=$(jq -r --arg id "$ACTIVE_ID" '.milestones[] | select(.id == $id)' "$MIL_FILE" 2>/dev/null)
+if [ -z "$MILESTONE" ]; then
+  exit 0
+fi
+
+TITLE=$(echo "$MILESTONE" | jq -r '.title // empty')
+STATUS=$(echo "$MILESTONE" | jq -r '.status // empty')
+TOTAL_TASKS=$(echo "$MILESTONE" | jq -r '.tasks | length' 2>/dev/null || echo 0)
+COMPLETED_TASKS=$(echo "$MILESTONE" | jq -r '[.tasks[] | select(.status == "completed")] | length' 2>/dev/null || echo 0)
+
+CYAN="\033[36m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+DIM="\033[2m"
+RESET="\033[0m"
+
+STATUS_ICON="▶ In Progress"
+STATUS_COLOR="$YELLOW"
+if [ "$STATUS" = "completed" ]; then
+  STATUS_ICON="✔ Completed"
+  STATUS_COLOR="$GREEN"
+elif [ "$STATUS" = "not_started" ]; then
+  STATUS_ICON="⏸ Not Started"
+  STATUS_COLOR="$DIM"
+fi
+
+printf "${CYAN}🎯 %s: %s${RESET} ${DIM}[%s/%s]${RESET} ${STATUS_COLOR}%s${RESET}" "$ACTIVE_ID" "$TITLE" "$COMPLETED_TASKS" "$TOTAL_TASKS" "$STATUS_ICON"

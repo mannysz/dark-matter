@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Description: Shows agy current cycle mode (e.g., plan, accept-edits, normal)
+#
+# Reads agy telemetry JSON from stdin and prints styled mode badge.
+
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
+  exit 0
+fi
+
+# Styling
+BLUE="\033[34m"
+MAGENTA="\033[35m"
+CYAN="\033[36m"
+YELLOW="\033[33m"
+GREEN="\033[32m"
+DIM="\033[2m"
+RESET="\033[0m"
+
+# Extract cycle mode or agent state
+CYCLE_MODE=$(echo "$INPUT" | jq -r '.cycle_mode // .mode // empty' 2>/dev/null)
+
+if [ -z "$CYCLE_MODE" ]; then
+  exit 0
+fi
+
+# Friendly display text & color formatting
+case "$CYCLE_MODE" in
+  "plan")
+    printf "${MAGENTA}⚡ plan${RESET}"
+    ;;
+  "accept-edits"|"accepting-edits")
+    printf "${GREEN}✍ accept-edits${RESET}"
+    ;;
+  "normal"|"default")
+    printf "${DIM}● normal${RESET}"
+    ;;
+  "review")
+    printf "${YELLOW}👁 review${RESET}"
+    ;;
+  *)
+    printf "${CYAN}● %s${RESET}" "$CYCLE_MODE"
+    ;;
+esac

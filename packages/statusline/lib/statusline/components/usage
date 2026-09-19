@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Description: Shows 5h and weekly quota usage with countdown timers and context window
+#
+# Reads agy telemetry JSON from stdin and prints usage metrics.
+
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
+  exit 0
+fi
+
+# Color definitions
+GREEN="\033[32m"
+YELLOW="\033[33m"
+RED="\033[31m"
+DIM="\033[2m"
+RESET="\033[0m"
+
+# Format remaining seconds into a concise human string (e.g., "3h 45m", "4d 1h", "22m")
+format_countdown() {
+  local SECS="$1"
+  if [ -z "$SECS" ] || [ "$SECS" -le 0 ] 2>/dev/null; then
+    echo "now"
+    return
+  fi
+
+  local DAYS=$((SECS / 86400))
+  local HOURS=$(((SECS % 86400) / 3600))
+  local MINS=$(((SECS % 3600) / 60))
+
+  if [ "$DAYS" -gt 0 ]; then
+    if [ "$HOURS" -gt 0 ]; then
+      echo "${DAYS}d ${HOURS}h"
+    else
+      echo "${DAYS}d"
+    fi
+  elif [ "$HOURS" -gt 0 ]; then
+    if [ "$MINS" -gt 0 ]; then
+      echo "${HOURS}h ${MINS}m"
+    else
+      echo "${HOURS}h"
+    fi
+  else
+    echo "${MINS}m"
+  fi
+}
+
+get_quota_color() {
+  local VAL="$1"
+  if [ -z "$VAL" ]; then
+    echo "$DIM"
+  elif [ "$VAL" -ge 50 ]; then
+    echo "$GREEN"
+  elif [ "$VAL" -ge 20 ]; then
+    echo "$YELLOW"
+  else
+    echo "$RED"
+  fi
+}
+
+get_context_color() {
+  local VAL="$1"
+  if [ -z "$VAL" ]; then
+    echo "$DIM"
+  elif [ "$VAL" -lt 60 ]; then
+    echo "$GREEN"
+  elif [ "$VAL" -lt 85 ]; then
+    echo "$YELLOW"
+  else
+    echo "$RED"
+  fi
+}
+
+# Extract telemetry metrics
+FIVE_HOUR_PCT=$(echo "$INPUT" | jq -r '(.quota["gemini-5h"].remaining_fraction // .quota["3p-5h"].remaining_fraction // empty) | if . != null then (. * 100 | round) else empty end' 2>/dev/null)
+FIVE_HOUR_RESET=$(echo "$INPUT" | jq -r '(.quota["gemini-5h"].reset_in_seconds // .quota["3p-5h"].reset_in_seconds // empty)' 2>/dev/null)
+
+WEEKLY_PCT=$(echo "$INPUT" | jq -r '(.quota["gemini-weekly"].remaining_fraction // .quota["3p-weekly"].remaining_fraction // empty) | if . != null then (. * 100 | round) else empty end' 2>/dev/null)
+WEEKLY_RESET=$(echo "$INPUT" | jq -r '(.quota["gemini-weekly"].reset_in_seconds // .quota["3p-weekly"].reset_in_seconds // empty)' 2>/dev/null)
+
+CTX_PCT=$(echo "$INPUT" | jq -r '(.context_window.used_percentage // empty) | if . != null then (. | round) else empty end' 2>/dev/null)
+
+PARTS=()
+
+if [ -n "$FIVE_HOUR_PCT" ]; then
+  C5H=$(get_quota_color "$FIVE_HOUR_PCT")
+  RESET_STR=""
+  if [ -n "$FIVE_HOUR_RESET" ] && [ "$FIVE_HOUR_RESET" -gt 0 ] 2>/dev/null; then
+    COUNTDOWN=$(format_countdown "$FIVE_HOUR_RESET")
+    RESET_STR=" ${DIM}(${COUNTDOWN})${RESET}"
+  fi
+  PARTS+=("${DIM}5h:${RESET} ${C5H}${FIVE_HOUR_PCT}%${RESET}${RESET_STR}")
+fi
+
+if [ -n "$WEEKLY_PCT" ]; then
+  CWK=$(get_quota_color "$WEEKLY_PCT")
+  RESET_STR=""
+  if [ -n "$WEEKLY_RESET" ] && [ "$WEEKLY_RESET" -gt 0 ] 2>/dev/null; then
+    COUNTDOWN=$(format_countdown "$WEEKLY_RESET")
+    RESET_STR=" ${DIM}(${COUNTDOWN})${RESET}"
+  fi
+  PARTS+=("${DIM}Wk:${RESET} ${CWK}${WEEKLY_PCT}%${RESET}${RESET_STR}")
+fi
+
+if [ -n "$CTX_PCT" ]; then
+  CCTX=$(get_context_color "$CTX_PCT")
+  PARTS+=("${CCTX}${CTX_PCT}%${RESET} ${DIM}ctx${RESET}")
+fi
+
+if [ ${#PARTS[@]} -gt 0 ]; then
+  RESULT_JOINED=""
+  for p in "${PARTS[@]}"; do
+    if [ -z "$RESULT_JOINED" ]; then
+      RESULT_JOINED="$p"
+    else
+      RESULT_JOINED="$RESULT_JOINED, $p"
+    fi
+  done
+  printf "[%b]" "$RESULT_JOINED"
+fi

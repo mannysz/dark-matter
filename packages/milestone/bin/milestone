@@ -1,0 +1,317 @@
+#!/usr/bin/env node
+
+/**
+ * Milestone CLI Utility
+ * Manages .milestones.json for real-time task progress and TUI statusline tracking.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const FILE_NAME = '.milestones.json';
+
+// Find .milestones.json recursively upwards from current directory
+function findMilestonesPath(startDir = process.cwd()) {
+  let current = startDir;
+  while (current && current !== path.parse(current).root) {
+    const candidate = path.join(current, FILE_NAME);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  // Default to current directory if not found
+  return path.join(process.cwd(), FILE_NAME);
+}
+
+function loadState(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {
+      milestone: null,
+      status: 'idle',
+      current_focus: 'Idle',
+      progress: '0/0',
+      tasks: [],
+      updated_at: new Date().toISOString()
+    };
+  }
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error(`\x1b[31mError reading ${filePath}: ${err.message}\x1b[0m`);
+    process.exit(1);
+  }
+}
+
+function saveState(filePath, state) {
+  state.updated_at = new Date().toISOString();
+  fs.writeFileSync(filePath, JSON.stringify(state, null, 2) + '\n', 'utf8');
+}
+
+function recalcProgress(state) {
+  const total = state.tasks.length;
+  const completed = state.tasks.filter(t => t.status === 'completed').length;
+  state.progress = `${completed}/${total}`;
+  if (total > 0 && completed === total) {
+    state.status = 'completed';
+  } else if (completed > 0 || state.tasks.some(t => t.status === 'in_progress')) {
+    state.status = 'in_progress';
+  } else if (total > 0) {
+    state.status = 'pending';
+  }
+  return state;
+}
+
+function renderProgressBar(completed, total, width = 14) {
+  if (total === 0) return '[\x1b[90m' + '░'.repeat(width) + '\x1b[0m] 0%';
+  const pct = Math.round((completed / total) * 100);
+  const filled = Math.round((completed / total) * width);
+  const empty = width - filled;
+  const bar = '\x1b[32m' + '█'.repeat(filled) + '\x1b[90m' + '░'.repeat(empty) + '\x1b[0m';
+  return `[${bar}] ${pct}% (${completed}/${total})`;
+}
+
+// CLI Command Handlers
+const args = process.argv.slice(2);
+const command = args[0] || 'help';
+
+const filePath = findMilestonesPath();
+
+switch (command.toLowerCase()) {
+  case 'set':
+  case 'init': {
+    const title = args.slice(1).join(' ').trim();
+    if (!title) {
+      console.error('\x1b[31mUsage: milestone set "<Milestone Title>"\x1b[0m');
+      process.exit(1);
+    }
+    const state = loadState(filePath);
+    state.milestone = title;
+    state.status = 'in_progress';
+    if (!state.current_focus || state.current_focus === 'Idle') {
+      state.current_focus = 'Initializing milestone';
+    }
+    recalcProgress(state);
+    saveState(filePath, state);
+    console.log(`\x1b[32m✔ Active milestone set to:\x1b[0m \x1b[1m${title}\x1b[0m`);
+    console.log(`  File: ${filePath}`);
+    break;
+  }
+
+  case 'focus': {
+    const focusText = args.slice(1).join(' ').trim();
+    if (!focusText) {
+      console.error('\x1b[31mUsage: milestone focus "<Current Focus Description>"\x1b[0m');
+      process.exit(1);
+    }
+    const state = loadState(filePath);
+    state.current_focus = focusText;
+    saveState(filePath, state);
+    console.log(`\x1b[36m⚡ Current focus updated:\x1b[0m \x1b[1m${focusText}\x1b[0m`);
+    break;
+  }
+
+  case 'task': {
+    const sub = args[1];
+    const rest = args.slice(2).join(' ').trim();
+    const state = loadState(filePath);
+
+    if (!sub || sub === 'help') {
+      console.log(`Usage:
+  milestone task add "<text>"       Add a new task
+  milestone task start <id|text>    Mark task in-progress & set focus
+  milestone task done <id|text>     Mark task completed
+  milestone task remove <id|text>   Remove a task`);
+      process.exit(0);
+    }
+
+    if (sub === 'add') {
+      if (!rest) {
+        console.error('\x1b[31mUsage: milestone task add "<Task Description>"\x1b[0m');
+        process.exit(1);
+      }
+      const nextId = state.tasks.reduce((max, t) => Math.max(max, t.id || 0), 0) + 1;
+      const newTask = {
+        id: nextId,
+        text: rest,
+        status: 'pending'
+      };
+      state.tasks.push(newTask);
+      recalcProgress(state);
+      saveState(filePath, state);
+      console.log(`\x1b[32m✔ Added task #${nextId}:\x1b[0m ${rest} \x1b[90m[${state.progress}]\x1b[0m`);
+    } else if (sub === 'done' || sub === 'complete') {
+      if (!rest) {
+        console.error('\x1b[31mUsage: milestone task done <id | pattern>\x1b[0m');
+        process.exit(1);
+      }
+      const numId = parseInt(rest, 10);
+      const target = state.tasks.find(t => (!isNaN(numId) && t.id === numId) || t.text.toLowerCase().includes(rest.toLowerCase()));
+      if (!target) {
+        console.error(`\x1b[31mTask matching "${rest}" not found.\x1b[0m`);
+        process.exit(1);
+      }
+      target.status = 'completed';
+      recalcProgress(state);
+
+      // If finished task was the focus, advance focus to next task
+      if (state.current_focus === target.text) {
+        const nextTask = state.tasks.find(t => t.status === 'in_progress') || state.tasks.find(t => t.status === 'pending');
+        state.current_focus = nextTask ? nextTask.text : 'Milestone complete';
+      }
+
+      saveState(filePath, state);
+      console.log(`\x1b[32m✔ Completed task #${target.id}:\x1b[0m \x1b[90m\x1b[9m${target.text}\x1b[0m \x1b[33m[${state.progress}]\x1b[0m`);
+    } else if (sub === 'start') {
+      if (!rest) {
+        console.error('\x1b[31mUsage: milestone task start <id | pattern>\x1b[0m');
+        process.exit(1);
+      }
+      const numId = parseInt(rest, 10);
+      const target = state.tasks.find(t => (!isNaN(numId) && t.id === numId) || t.text.toLowerCase().includes(rest.toLowerCase()));
+      if (!target) {
+        console.error(`\x1b[31mTask matching "${rest}" not found.\x1b[0m`);
+        process.exit(1);
+      }
+      target.status = 'in_progress';
+      state.current_focus = target.text;
+      recalcProgress(state);
+      saveState(filePath, state);
+      console.log(`\x1b[36m▶ Started task #${target.id}:\x1b[0m \x1b[1m${target.text}\x1b[0m`);
+    } else if (sub === 'remove' || sub === 'rm') {
+      if (!rest) {
+        console.error('\x1b[31mUsage: milestone task remove <id | pattern>\x1b[0m');
+        process.exit(1);
+      }
+      const numId = parseInt(rest, 10);
+      const initLen = state.tasks.length;
+      state.tasks = state.tasks.filter(t => !((!isNaN(numId) && t.id === numId) || t.text.toLowerCase().includes(rest.toLowerCase())));
+      if (state.tasks.length === initLen) {
+        console.error(`\x1b[31mTask matching "${rest}" not found.\x1b[0m`);
+        process.exit(1);
+      }
+      recalcProgress(state);
+      saveState(filePath, state);
+      console.log(`\x1b[33m✔ Removed task matching "${rest}".\x1b[0m \x1b[90m[${state.progress}]\x1b[0m`);
+    } else {
+      console.error(`\x1b[31mUnknown task action: ${sub}\x1b[0m`);
+      process.exit(1);
+    }
+    break;
+  }
+
+  case 'mode': {
+    const targetMode = args[1] ? args[1].toLowerCase() : null;
+    const settingsPath = path.join(os.homedir(), '.gemini/antigravity-cli/settings.json');
+    if (!fs.existsSync(settingsPath)) {
+      console.error(`\x1b[31mSettings file not found: ${settingsPath}\x1b[0m`);
+      process.exit(1);
+    }
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    if (!settings.statusLine) {
+      settings.statusLine = { type: 'command', command: path.join(os.homedir(), '.local/bin/statusline.sh'), enabled: true };
+    }
+    // Always keep stack_with_default false so statusline.sh dynamically manages 1 vs 2 lines
+    settings.statusLine.stack_with_default = false;
+    settings.statusLine.enabled = true;
+
+    const currentMode = settings.statusLine.mode || 'single';
+
+    let newMode;
+    if (targetMode === 'stacked' || targetMode === 'double') {
+      newMode = 'stacked';
+    } else if (targetMode === 'single' || targetMode === 'compact') {
+      newMode = 'single';
+    } else if (targetMode === 'toggle') {
+      newMode = currentMode === 'stacked' ? 'single' : 'stacked';
+    } else if (!targetMode) {
+      console.log(`Current statusline mode: \x1b[1m${currentMode === 'stacked' ? 'stacked (2 lines)' : 'single (1 line compact)'}\x1b[0m`);
+      console.log('Usage: milestone mode [single | stacked | toggle]');
+      process.exit(0);
+    } else {
+      console.error(`\x1b[31mUnknown mode: ${targetMode}. Use "single", "stacked", or "toggle".\x1b[0m`);
+      process.exit(1);
+    }
+
+    settings.statusLine.mode = newMode;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+    const label = newMode === 'stacked' ? '\x1b[1;33mStacked (2 Lines: Model Top + Milestone Bottom)\x1b[0m' : '\x1b[1;36mSingle-Line (1 Line: Unified Compact)\x1b[0m';
+    console.log(`\x1b[32m✔ Statusline layout set to:\x1b[0m ${label}`);
+    break;
+  }
+
+  case 'status': {
+    const state = loadState(filePath);
+    if (!state.milestone) {
+      console.log('\x1b[90mNo active milestone found. Use "milestone set <title>" to create one.\x1b[0m');
+      process.exit(0);
+    }
+    const completed = state.tasks.filter(t => t.status === 'completed').length;
+    const total = state.tasks.length;
+
+    console.log(`\n\x1b[1;34m🎯 Milestone:\x1b[0m \x1b[1m${state.milestone}\x1b[0m \x1b[33m(${state.status})\x1b[0m`);
+    console.log(`\x1b[1;36m⚡ Focus:\x1b[0m     ${state.current_focus || 'None'}`);
+    console.log(`\x1b[1;32m📊 Progress:\x1b[0m  ${renderProgressBar(completed, total)}`);
+    console.log(`\x1b[90m📁 Location:\x1b[0m  ${filePath}\n`);
+
+    if (state.tasks.length > 0) {
+      console.log('\x1b[1mTasks:\x1b[0m');
+      state.tasks.forEach(t => {
+        let icon = '\x1b[90m[ ]\x1b[0m';
+        let textStyle = '';
+        if (t.status === 'completed') {
+          icon = '\x1b[32m[✓]\x1b[0m';
+          textStyle = '\x1b[90m\x1b[9m';
+        } else if (t.status === 'in_progress') {
+          icon = '\x1b[36m[▶]\x1b[0m';
+          textStyle = '\x1b[1m';
+        }
+        console.log(`  ${icon} #${t.id}: ${textStyle}${t.text}\x1b[0m`);
+      });
+      console.log('');
+    } else {
+      console.log('  \x1b[90m(No tasks added yet. Use "milestone task add <desc>")\x1b[0m\n');
+    }
+    break;
+  }
+
+  case 'json': {
+    const state = loadState(filePath);
+    console.log(JSON.stringify(state, null, 2));
+    break;
+  }
+
+  case 'clear':
+  case 'reset': {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`\x1b[32m✔ Milestone state cleared (${filePath}).\x1b[0m`);
+    } else {
+      console.log('\x1b[90mNo active milestone file to clear.\x1b[0m');
+    }
+    break;
+  }
+
+  case 'help':
+  default: {
+    console.log(`\x1b[1mMilestone CLI - Real-time Progress & Statusline Tracker\x1b[0m
+
+Usage:
+  milestone set "<title>"           Set/initialize active milestone
+  milestone task add "<text>"       Add a new task
+  milestone task start <id|text>    Start a task & set current focus
+  milestone task done <id|text>     Mark a task as completed
+  milestone task remove <id|text>   Remove a task
+  milestone focus "<text>"          Explicitly update current focus
+  milestone status                  Display formatted visual milestone summary
+  milestone json                    Print raw JSON data
+  milestone clear                   Clear active milestone file
+  milestone help                    Show this help message
+`);
+    break;
+  }
+}

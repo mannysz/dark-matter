@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Description: Shows current workspace directory and git repository status/branch
+#
+# Reads agy telemetry or environment to detect current folder & git status.
+
+INPUT=$(cat)
+
+TARGET_DIR="${STATUSLINE_CWD:-}"
+if [ -z "$TARGET_DIR" ]; then
+  TARGET_DIR=$(echo "$INPUT" | jq -r '.workspace_path // .cwd // empty' 2>/dev/null)
+fi
+if [ -z "$TARGET_DIR" ]; then
+  TARGET_DIR="$PWD"
+fi
+
+if [ ! -d "$TARGET_DIR" ]; then
+  TARGET_DIR="$PWD"
+fi
+
+# Styling
+MAGENTA="\033[35m"
+BLUE="\033[34m"
+YELLOW="\033[33m"
+GREEN="\033[32m"
+DIM="\033[2m"
+RESET="\033[0m"
+
+FOLDER_NAME=$(basename "$TARGET_DIR")
+
+# Check if within a git repo
+if git -C "$TARGET_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  BRANCH=$(git -C "$TARGET_DIR" symbolic-ref --short HEAD 2>/dev/null || git -C "$TARGET_DIR" rev-parse --short HEAD 2>/dev/null)
+  DIRTY=""
+  if [ -n "$(git -C "$TARGET_DIR" status --porcelain 2>/dev/null)" ]; then
+    DIRTY="*"
+  fi
+  
+  if [ -n "$DIRTY" ]; then
+    BRANCH_COLOR="$YELLOW"
+  else
+    BRANCH_COLOR="$GREEN"
+  fi
+
+  printf "${MAGENTA}%s${RESET} ${DIM}⎇${RESET} ${BRANCH_COLOR}%s%s${RESET}" "$FOLDER_NAME" "$BRANCH" "$DIRTY"
+else
+  printf "${MAGENTA}%s${RESET}" "$FOLDER_NAME"
+fi

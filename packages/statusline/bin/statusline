@@ -1,0 +1,363 @@
+#!/usr/bin/env bash
+
+# statusline - Modular, Extensible Statusline Engine for agy
+#
+# When called with zero arguments: renders active components in order.
+# When called with arguments: manages components (list, add, rm, order, reset).
+
+SETTINGS_FILE="$HOME/.gemini/antigravity-cli/settings.json"
+CONFIG_FILE="$HOME/.gemini/antigravity-cli/statusline_components.json"
+
+# Built-in components directory (resolving symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+BUILTIN_DIR="$SCRIPT_DIR/../lib/statusline/components"
+USER_DIR="$HOME/.config/statusline/components"
+
+# Ensure directories exist
+mkdir -p "$USER_DIR" 2>/dev/null || true
+
+# Default components
+DEFAULT_COMPONENTS=("model" "mode" "project" "usage")
+
+# Read active components from config file or settings.json
+get_active_components() {
+  if [ -f "$CONFIG_FILE" ] && command -v jq >/dev/null 2>&1; then
+    if jq -e 'has("active")' "$CONFIG_FILE" >/dev/null 2>&1; then
+      jq -r '.active[]? // empty' "$CONFIG_FILE" 2>/dev/null
+      return
+    fi
+  fi
+  if [ -f "$SETTINGS_FILE" ] && command -v jq >/dev/null 2>&1; then
+    if jq -e '.statusLine | has("components")' "$SETTINGS_FILE" >/dev/null 2>&1; then
+      jq -r '.statusLine.components[]? // empty' "$SETTINGS_FILE" 2>/dev/null
+      return
+    fi
+  fi
+  printf "%s\n" "${DEFAULT_COMPONENTS[@]}"
+}
+
+# Save active components to config file
+save_active_components() {
+  local comps=("$@")
+  local json
+  json=$(jq -n --argjson arr "$(printf '%s\n' "${comps[@]}" | jq -R . | jq -s .)" '{active: $arr}')
+  echo "$json" > "$CONFIG_FILE"
+}
+
+# Find executable component script by name
+find_component_path() {
+  local name="$1"
+  if [ -x "$USER_DIR/$name" ]; then
+    echo "$USER_DIR/$name"
+  elif [ -x "$BUILTIN_DIR/$name" ]; then
+    echo "$BUILTIN_DIR/$name"
+  else
+    return 1
+  fi
+}
+
+# Extract one-line description from component file
+get_component_desc() {
+  local file="$1"
+  local desc
+  desc=$(head -n 5 "$file" 2>/dev/null | grep -i '^# *Description:' | sed -e 's/^# *Description: *//i' | head -n 1)
+  if [ -z "$desc" ]; then
+    desc="Custom statusline component"
+  fi
+  echo "$desc"
+}
+
+# Subcommands
+cmd_list() {
+  local active=()
+  while IFS= read -r c; do
+    [ -n "$c" ] && active+=("$c")
+  done < <(get_active_components)
+
+  # Find all components (both built-in and user)
+  local all_names=()
+  for dir in "$BUILTIN_DIR" "$USER_DIR"; do
+    if [ -d "$dir" ]; then
+      for f in "$dir"/*; do
+        if [ -f "$f" ] && [ -x "$f" ]; then
+          local base
+          base=$(basename "$f")
+          # Ignore hidden or archived files
+          if [[ "$base" != .* && "$base" != *.archived ]]; then
+            all_names+=("$base")
+          fi
+        fi
+      done
+    fi
+  done
+
+  # Deduplicate component names
+  local unique_names=()
+  while IFS= read -r u; do
+    [ -n "$u" ] && unique_names+=("$u")
+  done < <(printf "%s\n" "${all_names[@]}" | sort -u)
+
+  echo "Statusline Components:"
+  printf "  %-12s %-12s %s\n" "COMPONENT" "STATUS" "DESCRIPTION"
+  printf "  %-12s %-12s %s\n" "---------" "------" "-----------"
+
+  for name in "${unique_names[@]}"; do
+    local is_active="disabled"
+    for a in "${active[@]}"; do
+      if [ "$a" = "$name" ]; then
+        is_active="enabled"
+        break
+      fi
+    done
+
+    local path
+    path=$(find_component_path "$name")
+    local desc=""
+    [ -n "$path" ] && desc=$(get_component_desc "$path")
+
+    local status_text="off"
+    [ "$is_active" = "enabled" ] && status_text="✔ active"
+
+    local line
+    line=$(printf "  %-12s %-12s %s" "$name" "$status_text" "$desc")
+    if [ "$is_active" = "enabled" ]; then
+      printf "\033[32m%s\033[0m\n" "$line"
+    else
+      printf "\033[2m%s\033[0m\n" "$line"
+    fi
+  done
+
+  echo ""
+  local order_display=""
+  local idx=1
+  for a in "${active[@]}"; do
+    if [ -n "$order_display" ]; then
+      order_display="$order_display  "
+    fi
+    order_display="${order_display}[$idx] $a"
+    ((idx++))
+  done
+  echo "Active Order: $order_display"
+  echo "Usage:"
+  echo "  !statusline add <component...>       - Enable component(s)"
+  echo "  !statusline rm <component...|all>    - Disable component(s)"
+  echo "  !statusline order <1 2 3 4|c1 c2...> - Set sequence by index or name"
+  echo "  !statusline reset                    - Reset to default (${DEFAULT_COMPONENTS[*]})"
+}
+
+cmd_add() {
+  if [ $# -eq 0 ]; then
+    echo "Error: Specify at least one component to add. Run '!statusline list' to see available components."
+    exit 1
+  fi
+
+  local active=()
+  while IFS= read -r c; do
+    [ -n "$c" ] && active+=("$c")
+  done < <(get_active_components)
+
+  for name in "$@"; do
+    if ! find_component_path "$name" >/dev/null 2>&1; then
+      echo "Warning: Component '$name' not found in built-ins or ~/.config/statusline/components."
+    fi
+    # Check if already in active list
+    local already=false
+    for a in "${active[@]}"; do
+      if [ "$a" = "$name" ]; then
+        already=true
+        break
+      fi
+    done
+    if [ "$already" = false ]; then
+      active+=("$name")
+      echo "Added '$name' to statusline."
+    else
+      echo "'$name' is already active."
+    fi
+  done
+
+  save_active_components "${active[@]}"
+  echo "Active components: ${active[*]}"
+}
+
+cmd_rm() {
+  if [ $# -eq 0 ]; then
+    echo "Error: Specify at least one component to remove. Run '!statusline list' to see active components."
+    exit 1
+  fi
+
+  if [ "$1" = "all" ]; then
+    save_active_components
+    echo "Removed all components from statusline."
+    echo "Active components: "
+    return
+  fi
+
+  local active=()
+  while IFS= read -r c; do
+    [ -n "$c" ] && active+=("$c")
+  done < <(get_active_components)
+
+  local new_active=()
+  for a in "${active[@]}"; do
+    local drop=false
+    for name in "$@"; do
+      if [ "$a" = "$name" ]; then
+        drop=true
+        echo "Removed '$name' from statusline."
+        break
+      fi
+    done
+    if [ "$drop" = false ]; then
+      new_active+=("$a")
+    fi
+  done
+
+  save_active_components "${new_active[@]}"
+  echo "Active components: ${new_active[*]}"
+}
+
+cmd_order() {
+  if [ $# -eq 0 ]; then
+    echo "Error: Specify component order by numbers or names, e.g. '!statusline order 4 1 2 3' or '!statusline order usage model project'"
+    exit 1
+  fi
+
+  local active=()
+  while IFS= read -r c; do
+    [ -n "$c" ] && active+=("$c")
+  done < <(get_active_components)
+
+  local new_order=()
+  for arg in "$@"; do
+    if [[ "$arg" =~ ^[0-9]+$ ]]; then
+      local idx=$((arg - 1))
+      if [ "$idx" -ge 0 ] && [ "$idx" -lt "${#active[@]}" ]; then
+        new_order+=("${active[$idx]}")
+      else
+        echo "Error: Index $arg is out of bounds (1 to ${#active[@]}). Run '!statusline list' to see active components."
+        exit 1
+      fi
+    else
+      if ! find_component_path "$arg" >/dev/null 2>&1; then
+        echo "Warning: Component '$arg' not found."
+      fi
+      new_order+=("$arg")
+    fi
+  done
+
+  save_active_components "${new_order[@]}"
+  echo "Updated statusline order: ${new_order[*]}"
+}
+
+cmd_reset() {
+  save_active_components "${DEFAULT_COMPONENTS[@]}"
+  echo "Statusline reset to default: ${DEFAULT_COMPONENTS[*]}"
+}
+
+# Argument Dispatcher
+if [ $# -gt 0 ]; then
+  case "$1" in
+    list|status)
+      cmd_list
+      exit 0
+      ;;
+    add)
+      shift
+      cmd_add "$@"
+      exit 0
+      ;;
+    rm|remove|delete)
+      shift
+      cmd_rm "$@"
+      exit 0
+      ;;
+    order)
+      shift
+      cmd_order "$@"
+      exit 0
+      ;;
+    reset)
+      cmd_reset
+      exit 0
+      ;;
+    single|stacked|toggle|mode)
+      # For backwards compatibility with old mode commands
+      echo "Layout modes are deprecated. Use '!statusline add <component>' or '!statusline rm <component>' to configure."
+      exit 0
+      ;;
+    help|--help|-h)
+      echo "Usage: statusline [command] [args...]"
+      echo "  statusline list             - List available components and active status"
+      echo "  statusline add <comp...>    - Enable one or more components"
+      echo "  statusline rm <comp...>     - Disable one or more components"
+      echo "  statusline order <c1> <c2>  - Set display sequence"
+      echo "  statusline reset            - Reset to default (${DEFAULT_COMPONENTS[*]})"
+      echo "  statusline                  - Render live statusline (used by agy)"
+      exit 0
+      ;;
+    *)
+      echo "Unknown command: $1. Run 'statusline help' for usage."
+      exit 1
+      ;;
+  esac
+fi
+
+# ---------------------------------------------------------
+# Live Statusline Renderer (Executed on 0 arguments by agy)
+# ---------------------------------------------------------
+
+# Read telemetry JSON from stdin if piped
+STDIN_DATA=""
+if [ ! -t 0 ]; then
+  STDIN_DATA=$(cat)
+fi
+
+# Determine workspace directory
+WORKSPACE_CWD="${STATUSLINE_CWD:-}"
+if [ -z "$WORKSPACE_CWD" ] && [ -n "$STDIN_DATA" ]; then
+  WORKSPACE_CWD=$(echo "$STDIN_DATA" | jq -r '.workspace_path // .cwd // empty' 2>/dev/null)
+fi
+if [ -z "$WORKSPACE_CWD" ]; then
+  WORKSPACE_CWD="$PWD"
+fi
+export STATUSLINE_CWD="$WORKSPACE_CWD"
+
+# Retrieve active components
+ACTIVE_COMPONENTS=()
+while IFS= read -r c; do
+  [ -n "$c" ] && ACTIVE_COMPONENTS+=("$c")
+done < <(get_active_components)
+
+OUTPUTS=()
+SEP="\033[2m | \033[0m"
+
+for comp in "${ACTIVE_COMPONENTS[@]}"; do
+  COMP_PATH=$(find_component_path "$comp")
+  if [ -n "$COMP_PATH" ] && [ -x "$COMP_PATH" ]; then
+    # Pipe telemetry JSON directly to component
+    RESULT=$(echo "$STDIN_DATA" | "$COMP_PATH" 2>/dev/null)
+    if [ -n "$RESULT" ]; then
+      OUTPUTS+=("$RESULT")
+    fi
+  fi
+done
+
+if [ ${#OUTPUTS[@]} -gt 0 ]; then
+  FIRST=true
+  for out in "${OUTPUTS[@]}"; do
+    if [ "$FIRST" = true ]; then
+      printf "%b" "$out"
+      FIRST=false
+    else
+      printf "%b%b" "$SEP" "$out"
+    fi
+  done
+  printf "\n"
+fi

@@ -1,0 +1,22 @@
+{
+  "name": "@dark-matter/cli",
+  "version": "1.0.0",
+  "description": "The complete Dark Matter umbrella suite for Google Antigravity (agy)",
+  "bin": {
+    "dark-matter": "bin/dark-matter"
+  },
+  "dependencies": {
+    "@dark-matter/neuron": "^1.0.0",
+    "@dark-matter/statusline": "^1.0.0",
+    "@dark-matter/milestone": "^1.0.0"
+  },
+  "keywords": [
+    "antigravity",
+    "agy",
+    "cli",
+    "dark-matter",
+    "plugins"
+  ],
+  "author": "Manny Silva",
+  "license": "MIT"
+}

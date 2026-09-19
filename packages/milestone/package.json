@@ -1,0 +1,22 @@
+{
+  "name": "@dark-matter/milestone",
+  "version": "1.0.0",
+  "description": "Ambient terminal milestone & task execution tracker for Google Antigravity (agy)",
+  "main": "bin/milestone",
+  "bin": {
+    "milestone": "bin/milestone"
+  },
+  "scripts": {
+    "test": "node milestone.test.js"
+  },
+  "keywords": [
+    "antigravity",
+    "agy",
+    "milestone",
+    "tasks",
+    "tracker",
+    "dark-matter"
+  ],
+  "author": "Manny Silva",
+  "license": "MIT"
+}

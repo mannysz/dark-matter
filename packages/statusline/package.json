@@ -1,0 +1,21 @@
+{
+  "name": "@dark-matter/statusline",
+  "version": "1.0.0",
+  "description": "Modular, telemetry-aware terminal status bar engine for Google Antigravity (agy)",
+  "bin": {
+    "statusline": "bin/statusline"
+  },
+  "scripts": {
+    "test": "bash statusline_modular.test.sh"
+  },
+  "keywords": [
+    "antigravity",
+    "agy",
+    "statusline",
+    "terminal",
+    "tui",
+    "dark-matter"
+  ],
+  "author": "Manny Silva",
+  "license": "MIT"
+}

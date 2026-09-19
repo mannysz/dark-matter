@@ -1,0 +1,19 @@
+{
+  "name": "@dark-matter/neuron",
+  "version": "1.0.0",
+  "description": "Progressive Non-Linear Context Graph (PNG-RAG) cognitive memory engine for Google Antigravity (agy)",
+  "main": "bin/neuron.js",
+  "bin": {
+    "neuron": "bin/neuron"
+  },
+  "keywords": [
+    "antigravity",
+    "agy",
+    "memory",
+    "rag",
+    "plugin",
+    "dark-matter"
+  ],
+  "author": "Manny Silva",
+  "license": "MIT"
+}

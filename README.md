@@ -57,6 +57,34 @@ git clone https://github.com/mannysz/dark-matter.git ~/.dark-matter
 ~/.dark-matter/install.sh
 ```
 
+### Option 3: Local Developer & Contributor Setup (`--link` Mode)
+If you are contributing to or developing packages in the `dark-matter` monorepo, link your working tree directly so all changes, tests, and commits are reflected immediately without re-installing:
+
+```bash
+# 1. Clone your fork or repo
+git clone https://github.com/mannysz/dark-matter.git ~/repo/dark-matter
+cd ~/repo/dark-matter
+
+# 2. Run installer in developer mode (symlinks plugins and binaries)
+./install.sh --link
+```
+
+*(Manual alternative: symlink `packages/<name>` to `~/.gemini/config/plugins/<name>` and `packages/<name>/bin/*` to `~/.local/bin/`.)*
+
+---
+
+## 👩‍💻 Developer Workflow & Contributing
+
+Because `dark-matter` uses native Antigravity plugins and CLI binaries, development is zero-friction:
+1. **Live Reloading**: Since plugins are symlinked via `./install.sh --link`, editing source files in `packages/neuron/`, `packages/statusline/`, or `packages/milestone/` takes effect immediately in your next `agy` command or session.
+2. **Validation**: Test your manifests before submitting PRs:
+   ```bash
+   agy plugin validate ./packages/neuron
+   agy plugin validate ./packages/statusline
+   agy plugin validate ./packages/milestone
+   ```
+3. **Commit & Push**: Work in feature branches and open pull requests against `main`.
+
 ---
 
 ## 🛠 Features

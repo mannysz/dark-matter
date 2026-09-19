@@ -10,12 +10,12 @@ Dark Matter is an ecosystem of modular plugins and native terminal tooling built
 
 Install only what you need, or install the full suite. Click any package below to view its complete documentation:
 
-| Package | Purpose | Docs | Installation |
+| Package | Purpose | Docs | Direct Install |
 | :--- | :--- | :---: | :--- |
 | **`@dark-matter/cli`** | Complete umbrella suite delivering memory, live telemetry status bar, and task execution in one install. | [📖 Docs](./packages/cli/README.md) | Clone & run `./install.sh` |
-| **`@dark-matter/neuron`** | Eliminates agent session amnesia with a dependency-free memory graph that recalls past context without token bloat. | [📖 Docs](./packages/neuron/README.md) | `agy plugin install ./packages/neuron` |
-| **`@dark-matter/statusline`** | Eliminates blind terminal coding by pinning live quota countdowns, model badges, and git branch to your status bar. | [📖 Docs](./packages/statusline/README.md) | `agy plugin install ./packages/statusline` |
-| **`@dark-matter/milestone`** `[Experimental]` | Prevents complex goals from derailing by ambiently tracking tasks and auto-advancing focus with zero LLM overhead. *(Work in progress)* | [📖 Docs](./packages/milestone/README.md) | `agy plugin install ./packages/milestone` |
+| **`@dark-matter/neuron`** | Eliminates agent session amnesia with a dependency-free memory graph that recalls past context without token bloat. | [📖 Docs](./packages/neuron/README.md) | `agy plugin install https://github.com/mannysz/dark-matter/tree/main/packages/neuron --trust` |
+| **`@dark-matter/statusline`** | Eliminates blind terminal coding by pinning live quota countdowns, model badges, and git branch to your status bar. | [📖 Docs](./packages/statusline/README.md) | `agy plugin install https://github.com/mannysz/dark-matter/tree/main/packages/statusline --trust` |
+| **`@dark-matter/milestone`** `[Experimental]` | Prevents complex goals from derailing by ambiently tracking tasks and auto-advancing focus with zero LLM overhead. *(Work in progress)* | [📖 Docs](./packages/milestone/README.md) | `agy plugin install https://github.com/mannysz/dark-matter/tree/main/packages/milestone --trust` |
 
 ---
 
@@ -37,25 +37,21 @@ Install only what you need, or install the full suite. Click any package below t
 
 ## ⚡ Quick Start & Installation
 
-### Option 1: Native Antigravity Plugin Import (`agy plugin install`)
-Clone the repository and install packages directly into your Antigravity environment:
+### Option 1: Direct GitHub URL Install (No Clone Required!)
+Install any plugin directly from GitHub with `agy plugin install` and the `--trust` flag:
 
 ```bash
-# Clone the Dark Matter monorepo
-git clone https://github.com/mannysz/dark-matter.git ~/.dark-matter
+# Install Neuron memory engine
+agy plugin install https://github.com/mannysz/dark-matter/tree/main/packages/neuron --trust
 
-# Install individual plugins into agy
-agy plugin install ~/.dark-matter/packages/neuron
-agy plugin install ~/.dark-matter/packages/statusline
-agy plugin install ~/.dark-matter/packages/milestone
+# Install Statusline telemetry status bar
+agy plugin install https://github.com/mannysz/dark-matter/tree/main/packages/statusline --trust
 
-# Symlink CLI binaries into your path (~/.local/bin)
-ln -sf ~/.dark-matter/packages/statusline/bin/statusline ~/.local/bin/statusline
-ln -sf ~/.dark-matter/packages/milestone/bin/milestone ~/.local/bin/milestone
-ln -sf ~/.dark-matter/packages/neuron/bin/neuron ~/.local/bin/neuron
+# Install Milestone task tracker
+agy plugin install https://github.com/mannysz/dark-matter/tree/main/packages/milestone --trust
 ```
 
-### Option 2: One-Step Automated Installer
+### Option 2: Full Suite Local Installer (CLI Binaries + Plugins)
 ```bash
 git clone https://github.com/mannysz/dark-matter.git ~/.dark-matter
 ~/.dark-matter/install.sh

@@ -2,8 +2,13 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATUSLINE_BIN="$(cd "$SCRIPT_DIR/../bin" && pwd)/statusline"
-LIB_COMP_DIR="$(cd "$SCRIPT_DIR/../lib/statusline/components" && pwd)"
+if [ -d "$SCRIPT_DIR/bin" ]; then
+  STATUSLINE_BIN="$SCRIPT_DIR/bin/statusline"
+  LIB_COMP_DIR="$SCRIPT_DIR/lib/statusline/components"
+else
+  STATUSLINE_BIN="$(cd "$SCRIPT_DIR/../bin" && pwd)/statusline"
+  LIB_COMP_DIR="$(cd "$SCRIPT_DIR/../lib/statusline/components" && pwd)"
+fi
 
 TMP_DIR="$(mktemp -d /tmp/statusline-modular-test.XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -27,9 +32,9 @@ fi
 echo "  ✔ Model component outputs correct name"
 
 # -------------------------------------------------------------
-# Unit Test 2: Isolated Usage Component
+# Unit Test 2: Isolated Usage Component (Legacy Mock Without Model)
 # -------------------------------------------------------------
-echo "• Test 2: Usage Component Execution (Quotas + Context + Countdown)"
+echo "• Test 2: Usage Component Execution (Quotas + Context + Countdown - Legacy Mock)"
 MOCK_USAGE='{"quota":{"gemini-5h":{"remaining_fraction":0.45,"reset_in_seconds":3600},"gemini-weekly":{"remaining_fraction":0.80,"reset_in_seconds":172800}},"context_window":{"used_percentage":6.51702880859375}}'
 OUT_USAGE=$(printf '%s' "$MOCK_USAGE" | "$LIB_COMP_DIR/usage")
 if [[ "$OUT_USAGE" != *"5h:"* ]] || [[ "$OUT_USAGE" != *"45%"* ]] || [[ "$OUT_USAGE" != *"(1h)"* ]] || [[ "$OUT_USAGE" != *"Wk:"* ]] || [[ "$OUT_USAGE" != *"80%"* ]] || [[ "$OUT_USAGE" != *"(2d)"* ]] || [[ "$OUT_USAGE" != *"7%"* ]] || [[ "$OUT_USAGE" != *"ctx"* ]]; then
@@ -37,6 +42,62 @@ if [[ "$OUT_USAGE" != *"5h:"* ]] || [[ "$OUT_USAGE" != *"45%"* ]] || [[ "$OUT_US
   exit 1
 fi
 echo "  ✔ Usage component parses quotas, countdowns, and context window"
+
+# -------------------------------------------------------------
+# Unit Test 2c: Active Model Auto-Detection (Standard Gemini 3.8 Flash)
+# -------------------------------------------------------------
+echo "• Test 2c: Active Model Auto-Detection (Standard Gemini 3.8 Flash - 5h + Weekly)"
+MOCK_USAGE_GEMINI='{"model":{"display_name":"Gemini 3.8 Flash"},"quota":{"gemini-5h":{"remaining_fraction":0.95,"reset_in_seconds":18000},"gemini-weekly":{"remaining_fraction":0.88,"reset_in_seconds":400000}},"context_window":{"used_percentage":12}}'
+OUT_USAGE_GEMINI=$(printf '%s' "$MOCK_USAGE_GEMINI" | "$LIB_COMP_DIR/usage")
+if [[ "$OUT_USAGE_GEMINI" != *"5h:"* ]] || [[ "$OUT_USAGE_GEMINI" != *"95%"* ]] || [[ "$OUT_USAGE_GEMINI" != *"(5h)"* ]] || [[ "$OUT_USAGE_GEMINI" != *"Wk:"* ]] || [[ "$OUT_USAGE_GEMINI" != *"88%"* ]] || [[ "$OUT_USAGE_GEMINI" != *"(4d 15h)"* ]] || [[ "$OUT_USAGE_GEMINI" != *"12%"* ]] || [[ "$OUT_USAGE_GEMINI" != *"ctx"* ]]; then
+  echo "FAIL: Usage component active-model Gemini 3.8 Flash failed. Got: '$OUT_USAGE_GEMINI'"
+  exit 1
+fi
+echo "  ✔ Gemini 3.8 Flash displays both 5h: 95% (5h) and Wk: 88% (4d 15h), 12% ctx"
+
+# -------------------------------------------------------------
+# Unit Test 2d: Active Model Auto-Detection (Gemini 4 Argon - Weekly Only)
+# -------------------------------------------------------------
+echo "• Test 2d: Active Model Auto-Detection (Gemini 4 Argon - Weekly Only, No 5h Limit)"
+MOCK_USAGE_ARGON='{"model":{"display_name":"Gemini 4 Argon"},"quota":{"gemini-5h":{"remaining_fraction":0.95,"reset_in_seconds":18000},"gemini-weekly":{"remaining_fraction":0.88,"reset_in_seconds":400000},"argon-weekly":{"remaining_fraction":0.75,"reset_in_seconds":230400}},"context_window":{"used_percentage":18}}'
+OUT_USAGE_ARGON=$(printf '%s' "$MOCK_USAGE_ARGON" | "$LIB_COMP_DIR/usage")
+if [[ "$OUT_USAGE_ARGON" == *"5h:"* ]]; then
+  echo "FAIL: Argon usage should not include 5h quota. Got: '$OUT_USAGE_ARGON'"
+  exit 1
+fi
+if [[ "$OUT_USAGE_ARGON" != *"Wk:"* ]] || [[ "$OUT_USAGE_ARGON" != *"75%"* ]] || [[ "$OUT_USAGE_ARGON" != *"(2d 16h)"* ]] || [[ "$OUT_USAGE_ARGON" != *"18%"* ]] || [[ "$OUT_USAGE_ARGON" != *"ctx"* ]]; then
+  echo "FAIL: Argon usage component failed. Got: '$OUT_USAGE_ARGON'"
+  exit 1
+fi
+echo "  ✔ Gemini 4 Argon displays ONLY Argon weekly usage and ctx (no 5h limit)"
+
+# -------------------------------------------------------------
+# Unit Test 2e: Active Model Auto-Detection (Gemini 4 Argon - Standalone Bucket)
+# -------------------------------------------------------------
+echo "• Test 2e: Active Model Auto-Detection (Gemini 4 Argon - Standalone 'argon' bucket)"
+MOCK_USAGE_ARGON_ONLY='{"model":{"id":"gemini-4-argon"},"quota":{"argon":{"remaining_fraction":0.60,"reset_in_seconds":86400}},"context_window":{"used_percentage":10}}'
+OUT_USAGE_ARGON_ONLY=$(printf '%s' "$MOCK_USAGE_ARGON_ONLY" | "$LIB_COMP_DIR/usage")
+if [[ "$OUT_USAGE_ARGON_ONLY" == *"5h:"* ]] || [[ "$OUT_USAGE_ARGON_ONLY" != *"Wk:"* ]] || [[ "$OUT_USAGE_ARGON_ONLY" != *"60%"* ]] || [[ "$OUT_USAGE_ARGON_ONLY" != *"(1d)"* ]] || [[ "$OUT_USAGE_ARGON_ONLY" != *"10%"* ]]; then
+  echo "FAIL: Standalone Argon quota bucket failed. Got: '$OUT_USAGE_ARGON_ONLY'"
+  exit 1
+fi
+echo "  ✔ Standalone 'argon' quota bucket correctly parsed as weekly quota"
+
+# -------------------------------------------------------------
+# Unit Test 2f: Active Model Auto-Detection (Real-world 'gemini-argon-wtu-weekly' key)
+# -------------------------------------------------------------
+echo "• Test 2f: Active Model Auto-Detection (Real-world 'gemini-argon-wtu-weekly' key)"
+MOCK_REAL_ARGON='{"model":{"id":"Gemini 4 Argon (Medium)","display_name":"Gemini 4 Argon (Medium)"},"quota":{"3p-5h":{"remaining_fraction":1,"reset_in_seconds":17580},"3p-weekly":{"remaining_fraction":1,"reset_in_seconds":604380},"gemini-5h":{"remaining_fraction":0.98,"reset_in_seconds":16699},"gemini-argon-wtu-weekly":{"remaining_fraction":0.833,"reset_in_seconds":582216},"gemini-weekly":{"remaining_fraction":0.988,"reset_in_seconds":603499}},"context_window":{"used_percentage":2.6}}'
+OUT_REAL_ARGON=$(printf '%s' "$MOCK_REAL_ARGON" | "$LIB_COMP_DIR/usage")
+if [[ "$OUT_REAL_ARGON" == *"5h:"* ]]; then
+  echo "FAIL: Real Argon telemetry should not include 5h quota. Got: '$OUT_REAL_ARGON'"
+  exit 1
+fi
+if [[ "$OUT_REAL_ARGON" != *"Wk:"* ]] || [[ "$OUT_REAL_ARGON" != *"83%"* ]] || [[ "$OUT_REAL_ARGON" != *"(6d 17h)"* ]] || [[ "$OUT_REAL_ARGON" != *"3%"* ]] || [[ "$OUT_REAL_ARGON" != *"ctx"* ]]; then
+  echo "FAIL: Real Argon telemetry component failed. Got: '$OUT_REAL_ARGON'"
+  exit 1
+fi
+echo "  ✔ Real-world 'gemini-argon-wtu-weekly' key matches correctly with 5h limit excluded"
 
 # -------------------------------------------------------------
 # Unit Test 2b: Isolated Mode Component
@@ -179,6 +240,27 @@ if [[ "$FULL_OUT" != *"Gemini 3.8 Flash"* ]] || [[ "$FULL_OUT" != *"95%"* ]] || 
 fi
 echo "  ✔ Pipeline composes active components separated by delimiters"
 
+# Verify last_statusline_stdin.json was saved for telemetry inspection
+if [ ! -f "$HOME/.gemini/antigravity-cli/last_statusline_stdin.json" ]; then
+  echo "FAIL: last_statusline_stdin.json was not created"
+  exit 1
+fi
+LAST_STDIN=$(cat "$HOME/.gemini/antigravity-cli/last_statusline_stdin.json")
+if [[ "$LAST_STDIN" != *"Gemini 3.8 Flash"* ]]; then
+  echo "FAIL: last_statusline_stdin.json content mismatch. Got: '$LAST_STDIN'"
+  exit 1
+fi
+echo "  ✔ STDIN_DATA saved to last_statusline_stdin.json for telemetry debugging"
+
+# Full Pipeline with Gemini 4 Argon (weekly only)
+MOCK_FULL_ARGON='{"model":{"display_name":"Gemini 4 Argon"},"quota":{"gemini-5h":{"remaining_fraction":0.95,"reset_in_seconds":18000},"gemini-weekly":{"remaining_fraction":0.88,"reset_in_seconds":400000},"argon-weekly":{"remaining_fraction":0.75,"reset_in_seconds":230400}},"context_window":{"used_percentage":18}}'
+FULL_ARGON_OUT=$(export STATUSLINE_CWD="$GIT_REPO"; printf '%s' "$MOCK_FULL_ARGON" | "$STATUSLINE_BIN")
+if [[ "$FULL_ARGON_OUT" == *"5h:"* ]] || [[ "$FULL_ARGON_OUT" != *"Gemini 4 Argon"* ]] || [[ "$FULL_ARGON_OUT" != *"75%"* ]]; then
+  echo "FAIL: Full pipeline output for Argon invalid. Got: '$FULL_ARGON_OUT'"
+  exit 1
+fi
+echo "  ✔ Pipeline for Gemini 4 Argon renders model and weekly-only quota"
+
 echo ""
-echo -e "\033[32m✔ All 6 Modular Statusline Tests Passed!\033[0m"
+echo -e "\033[32m✔ All Modular Statusline Tests Passed!\033[0m"
 echo ""

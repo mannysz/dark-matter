@@ -70,14 +70,84 @@ get_context_color() {
   fi
 }
 
-# Extract telemetry metrics
-FIVE_HOUR_PCT=$(echo "$INPUT" | jq -r '(.quota["gemini-5h"].remaining_fraction // .quota["3p-5h"].remaining_fraction // empty) | if . != null then (. * 100 | round) else empty end' 2>/dev/null)
-FIVE_HOUR_RESET=$(echo "$INPUT" | jq -r '(.quota["gemini-5h"].reset_in_seconds // .quota["3p-5h"].reset_in_seconds // empty)' 2>/dev/null)
+# Extract telemetry metrics with active-model auto-detection
+METRICS=$(echo "$INPUT" | jq -r '
+  ((.model.display_name // .model.id // "") | ascii_downcase) as $raw_m |
+  (
+    if $raw_m == "" then "none"
+    elif ($raw_m | contains("argon")) then "argon"
+    elif ($raw_m | (contains("claude") or contains("sonnet") or contains("opus") or contains("3p"))) then "3p"
+    elif ($raw_m | contains("gemini")) then "gemini"
+    else "other"
+    end
+  ) as $family |
+  ([ (.quota // {}) | to_entries[] |
+     {
+       key: .key,
+       val: .value,
+       k: (.key | ascii_downcase),
+       win: (((.value.window // "") | tostring) | ascii_downcase)
+     } |
+     . + {
+       is_5h: ((.k | contains("5h")) or (.win == "5h")),
+       is_weekly: ((.k | (contains("weekly") or contains("7d") or contains("1w"))) or (.win | (. == "weekly" or . == "7d" or . == "1w")))
+     }
+  ]) as $entries |
+  
+  # Resolve 5h object
+  (
+    if $family == "argon" then
+      (($entries | map(select((.k | contains("argon")) and .is_5h))[0].val) // null)
+    elif $family == "3p" then
+      (($entries | map(select((.k | (contains("3p") or contains("claude") or contains("sonnet") or contains("opus"))) and .is_5h))[0].val) //
+       .quota["3p-5h"] // .quota["claude-5h"] //
+       ($entries | map(select(.is_5h))[0].val) // null)
+    elif $family == "gemini" then
+      (($entries | map(select((.k | contains("gemini")) and (.k | contains("argon") | not) and .is_5h))[0].val) //
+       .quota["gemini-5h"] //
+       ($entries | map(select(.is_5h))[0].val) // null)
+    elif $family == "other" then
+      (($entries | map(select(. as $e | (($e.k | contains($raw_m)) or ($raw_m | contains($e.k))) and $e.is_5h))[0].val) //
+       ($entries | map(select(.is_5h))[0].val) // null)
+    else
+      (.quota["gemini-5h"] // .quota["3p-5h"] // ($entries | map(select(.is_5h))[0].val) // null)
+    end
+  ) as $q_5h |
+  
+  # Resolve weekly object
+  (
+    if $family == "argon" then
+      (($entries | map(select((.k | contains("argon")) and .is_weekly))[0].val) //
+       ($entries | map(select(.k | contains("argon")))[0].val) //
+       (if ($entries | map(select(.is_weekly)) | length == 1) then ($entries | map(select(.is_weekly))[0].val) else null end) //
+       .quota["gemini-weekly"] //
+       null)
+    elif $family == "3p" then
+      (($entries | map(select((.k | (contains("3p") or contains("claude") or contains("sonnet") or contains("opus"))) and .is_weekly))[0].val) //
+       .quota["3p-weekly"] // .quota["claude-weekly"] //
+       ($entries | map(select(.is_weekly))[0].val) // null)
+    elif $family == "gemini" then
+      (($entries | map(select((.k | contains("gemini")) and (.k | contains("argon") | not) and .is_weekly))[0].val) //
+       .quota["gemini-weekly"] //
+       ($entries | map(select(.is_weekly))[0].val) // null)
+    elif $family == "other" then
+      (($entries | map(select(. as $e | (($e.k | contains($raw_m)) or ($raw_m | contains($e.k))) and $e.is_weekly))[0].val) //
+       ($entries | map(select(.is_weekly))[0].val) // null)
+    else
+      (.quota["gemini-weekly"] // .quota["3p-weekly"] // ($entries | map(select(.is_weekly))[0].val) // null)
+    end
+  ) as $q_wk |
 
-WEEKLY_PCT=$(echo "$INPUT" | jq -r '(.quota["gemini-weekly"].remaining_fraction // .quota["3p-weekly"].remaining_fraction // empty) | if . != null then (. * 100 | round) else empty end' 2>/dev/null)
-WEEKLY_RESET=$(echo "$INPUT" | jq -r '(.quota["gemini-weekly"].reset_in_seconds // .quota["3p-weekly"].reset_in_seconds // empty)' 2>/dev/null)
+  (if ($q_5h != null and $q_5h.remaining_fraction != null) then ($q_5h.remaining_fraction * 100 | round) else "" end) as $f5_pct |
+  (if ($q_5h != null and $q_5h.reset_in_seconds != null) then $q_5h.reset_in_seconds else "" end) as $f5_rst |
+  (if ($q_wk != null and $q_wk.remaining_fraction != null) then ($q_wk.remaining_fraction * 100 | round) else "" end) as $wk_pct |
+  (if ($q_wk != null and $q_wk.reset_in_seconds != null) then $q_wk.reset_in_seconds else "" end) as $wk_rst |
+  (if (.context_window != null and .context_window.used_percentage != null) then (.context_window.used_percentage | round) else "" end) as $ctx_pct |
 
-CTX_PCT=$(echo "$INPUT" | jq -r '(.context_window.used_percentage // empty) | if . != null then (. | round) else empty end' 2>/dev/null)
+  [$f5_pct, $f5_rst, $wk_pct, $wk_rst, $ctx_pct] | map(tostring) | join("|")
+' 2>/dev/null)
+
+IFS="|" read -r FIVE_HOUR_PCT FIVE_HOUR_RESET WEEKLY_PCT WEEKLY_RESET CTX_PCT <<< "$METRICS"
 
 PARTS=()
 

@@ -317,6 +317,7 @@ fi
 STDIN_DATA=""
 if [ ! -t 0 ]; then
   STDIN_DATA=$(cat)
+  echo "$STDIN_DATA" > "$HOME/.gemini/antigravity-cli/last_statusline_stdin.json" 2>/dev/null || true
 fi
 
 # Determine workspace directory

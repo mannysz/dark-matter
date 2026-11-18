@@ -7,7 +7,21 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "bash packages/statusline/statusline_modular.test.sh && node packages/milestone/milestone.test.js"
+    "test": "bash packages/statusline/statusline_modular.test.sh && node packages/milestone/milestone.test.js && npm --workspace @dark-matter/neuron test"
+  },
+  "keywords": [
+    "pi-package"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./packages/neuron/extensions/neuron-pi.ts"
+    ],
+    "skills": [
+      "./packages/neuron/skills/neuron-engine"
+    ]
   },
   "author": "Manny Silva",
   "license": "MIT"
